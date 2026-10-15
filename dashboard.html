@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gaze — P&amp;L Dashboard</title>
+<style>
+  :root {
+    --bg: #04040a;
+    --surface: #09090f;
+    --card: #0d0d16;
+    --blue: #00c8ff;
+    --green: #50ff8c;
+    --red: #ff5050;
+    --gold: #ffe164;
+    --muted: #4a4a60;
+    --text: #dddde8;
+    --mono: 'Courier New', monospace;
+    --body: 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--body); }
+  canvas#orb { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; background: transparent; }
+
+  .hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; display: flex; flex-direction: column; }
+  .hud > * { pointer-events: auto; }
+
+  .hdr {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 12px 16px; background: rgba(13,13,22,0.88); border-bottom: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(8px);
+  }
+  .hdr-title { font-size: 14px; font-weight: 700; letter-spacing: 0.28em; text-transform: uppercase; color: var(--blue); }
+  .hdr-sub { font-size: 10px; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
+  .pnl-big { font-family: var(--mono); font-size: 22px; font-weight: 700; }
+  .pnl-big.pos { color: var(--green); text-shadow: 0 0 12px rgba(80,255,140,0.35); }
+  .pnl-big.neg { color: var(--red); text-shadow: 0 0 12px rgba(255,80,80,0.35); }
+  .pnl-big.flat { color: #b4c8dc; }
+  .pnl-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-left: 4px; }
+  .hdr-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .btn {
+    padding: 8px 14px; border: 1px solid rgba(255,255,255,0.12); background: transparent;
+    color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; cursor: pointer; transition: all 0.2s; font-family: var(--body);
+  }
+  .btn:hover { color: var(--text); border-color: rgba(255,255,255,0.28); }
+  .btn.primary { border-color: rgba(0,200,255,0.45); color: var(--blue); }
+  .btn.primary:hover { background: rgba(0,200,255,0.1); }
+  .btn.danger { border-color: rgba(255,80,80,0.4); color: var(--red); }
+  .btn.danger:hover { background: rgba(255,80,80,0.1); }
+  .btn.danger:disabled, .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn.active { color: var(--blue); border-color: rgba(0,200,255,0.5); background: rgba(0,200,255,0.08); }
+
+  .status-chip {
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+    border: 1px solid rgba(74,74,96,0.4); padding: 4px 8px; font-family: var(--mono);
+  }
+  .status-chip.ok { color: var(--green); border-color: rgba(80,255,140,0.35); }
+  .status-chip.err { color: var(--red); border-color: rgba(255,80,80,0.4); }
+
+  .risk-wrap {
+    padding: 10px 16px; background: rgba(9,9,15,0.85); border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .risk-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); min-width: 110px; }
+  .risk-track { flex: 1; min-width: 160px; height: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.06); position: relative; overflow: hidden; }
+  .risk-fill { height: 100%; width: 0%; transition: width 0.5s ease, background 0.3s; background: var(--green); }
+  .risk-fill.warn { background: var(--gold); }
+  .risk-fill.crit { background: var(--red); }
+  .risk-fill.hard { background: var(--red); box-shadow: 0 0 10px rgba(255,80,80,0.7); }
+  .risk-meta { font-family: var(--mono); font-size: 11px; color: var(--text); }
+  .risk-meta span { color: var(--muted); }
+  .risk-ticks { display: flex; gap: 12px; font-size: 9px; color: var(--muted); font-family: var(--mono); letter-spacing: 0.06em; }
+
+  .cards {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px; align-content: start;
+  }
+  .cards::-webkit-scrollbar { width: 6px; }
+  .cards::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
+
+  .card {
+    background: var(--card); border: 1px solid rgba(255,255,255,0.06);
+    border-left: 3px solid var(--muted); padding: 14px; cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    animation: cardIn 0.35s ease;
+  }
+  .card.long { border-left-color: var(--green); }
+  .card.short { border-left-color: var(--red); }
+  .card.selected { border-color: rgba(0,200,255,0.55); box-shadow: 0 0 0 1px rgba(0,200,255,0.25), 0 0 18px rgba(0,200,255,0.12); }
+  .card.entering { animation: cardIn 0.4s ease; }
+  .card.leaving { animation: cardOut 0.35s ease forwards; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+  @keyframes cardOut { to { opacity: 0; transform: translateY(-10px) scale(0.96); } }
+
+  .card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .card-sym { font-size: 16px; font-weight: 700; letter-spacing: 0.08em; }
+  .badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 3px 7px; border: 1px solid;
+  }
+  .badge.long { color: var(--green); border-color: rgba(80,255,140,0.4); background: rgba(80,255,140,0.08); }
+  .badge.short { color: var(--red); border-color: rgba(255,80,80,0.4); background: rgba(255,80,80,0.08); }
+
+  .card-pnl { font-family: var(--mono); font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .card-pnl.pos { color: var(--green); }
+  .card-pnl.neg { color: var(--red); }
+  .card-pnl.flat { color: #b4c8dc; }
+  .card-pnl-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .prices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; font-family: var(--mono); font-size: 11px; }
+  .prices .k { color: var(--muted); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; font-family: var(--body); margin-bottom: 2px; }
+  .prices .v { color: var(--text); }
+
+  .meta-row { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 11px; font-family: var(--mono); color: var(--muted); }
+  .meta-row .r { color: var(--text); }
+
+  .bar-block { margin-top: 10px; }
+  .bar-head { display: flex; justify-content: space-between; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; font-family: var(--body); }
+  .bar-track { height: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05); overflow: hidden; }
+  .bar-fill { height: 100%; transition: width 0.4s ease; }
+  .bar-fill.stop { background: var(--red); }
+  .bar-fill.target { background: var(--green); }
+
+  .empty {
+    grid-column: 1 / -1; text-align: center; padding: 48px 16px;
+    color: var(--muted); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+
+  .footer {
+    padding: 8px 16px; background: rgba(9,9,15,0.9); border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    font-size: 10px; color: var(--muted); font-family: var(--mono); letter-spacing: 0.06em;
+  }
+
+  /* Open position panel (storage_skill #prefill-panel pattern) */
+  #open-panel {
+    display: none; position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 50; width: min(440px, calc(100vw - 24px));
+    background: var(--card); border: 1px solid rgba(0,200,255,0.35);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.65), 0 0 24px rgba(0,200,255,0.08);
+    padding: 16px;
+  }
+  #open-panel.show { display: block; animation: cardIn 0.25s ease; }
+  .panel-title { font-size: 12px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--blue); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .panel-title .x { cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; padding: 2px 6px; }
+  .panel-title .x:hover { color: var(--text); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .field input, .field select {
+    background: #0a0a14; border: 1px solid rgba(255,255,255,0.1); color: var(--text);
+    font-family: var(--mono); font-size: 13px; padding: 8px 10px; outline: none;
+    transition: border-color 0.2s; width: 100%;
+  }
+  .field input:focus, .field select:focus { border-color: rgba(0,200,255,0.5); }
+  .panel-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .panel-actions .btn { flex: 1; }
+  #form-error { display: none; margin-top: 10px; font-size: 11px; color: var(--red); font-family: var(--mono); }
+  #form-error.show { display: block; }
+
+  #toast {
+    position: fixed; bottom: 48px; left: 50%; transform: translateX(-50%);
+    z-index: 60; padding: 10px 16px; background: var(--card);
+    border: 1px solid rgba(0,200,255,0.4); color: var(--text);
+    font-size: 12px; font-family: var(--mono); opacity: 0;
+    pointer-events: none; transition: opacity 0.25s;
+  }
+  #toast.show { opacity: 1; }
+  #toast.err { border-color: rgba(255,80,80,0.5); color: var(--red); }
+
+
+  /* The hidden attribute is a UA rule and loses to .cards { display: grid }.
+     Without this, el.hidden = true did nothing and the Closed toggle appeared stuck. */
+  [hidden] { display: none !important; }
+  /* Position presets — your working sizes, one click.
+     Margin is DOLLARS. $2,000 at 5x = a $10,000 position. */
+  .preset-row { display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;grid-column:1/-1; }
+  .preset-btn {
+    background:rgba(0,200,255,.06); border:1px solid rgba(0,200,255,.28); color:var(--accent);
+    border-radius:5px; padding:5px 10px; font-size:10px; cursor:pointer; font-family:var(--mono);
+    letter-spacing:.04em;
+  }
+  .preset-btn:hover { background:rgba(0,200,255,.15); border-color:var(--accent); }
+  .preset-btn small { display:block; color:var(--muted); font-size:9px; letter-spacing:0; }
+  .pos-readout { grid-column:1/-1; font-size:11px; color:var(--text);
+    background:rgba(2,8,20,.7); border:1px solid var(--line); border-radius:6px;
+    padding:8px 10px; margin-top:8px; font-variant-numeric:tabular-nums; }
+  .pos-readout b { color:var(--accent); }
+
+  /* Close-position percentage prompt */
+  .modal-back { position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.72);
+                display:flex;align-items:center;justify-content:center;padding:20px; }
+  .modal-box { width:min(460px,100%);background:#0b1020;border:1px solid var(--border);
+               border-radius:10px;padding:18px; }
+  .modal-title { font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+                 color:var(--accent);font-weight:700;margin-bottom:8px; }
+  .modal-sub { font-size:12px;color:var(--muted);line-height:1.7; }
+  .modal-sub b { color:var(--text); }
+  .pct-row { display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0 10px; }
+  .pct-btn { background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.3);color:var(--accent);
+             border-radius:7px;padding:12px 6px;cursor:pointer;font-size:15px;font-weight:700;
+             font-family:inherit;display:flex;flex-direction:column;gap:3px;align-items:center; }
+  .pct-btn small { font-size:10px;color:var(--muted);font-weight:400; }
+  .pct-btn:hover { background:rgba(0,200,255,.18); }
+  .pct-btn:last-child { border-color:rgba(255,92,92,.4);color:#ff8a8a;background:rgba(255,92,92,.07); }
+  .modal-note { font-size:11px;color:var(--muted);line-height:1.6; }
+  .modal-actions { display:flex;justify-content:flex-end;margin-top:14px; }
+
+  .cd-del { float:right;background:transparent;border:1px solid rgba(255,92,92,.35);
+            color:#ff8a8a;border-radius:4px;padding:2px 7px;font-size:9px;
+            cursor:pointer;font-family:inherit;letter-spacing:.06em; }
+  .cd-del:hover { background:rgba(255,92,92,.15); }
+  .cd-del:disabled { opacity:.5; cursor:default; }
+  /* Daily Take Profit — same meter shape, profit colour, and it resets with
+     Daily Risk because both come from today's closed book. */
+  .tp-fill { background: linear-gradient(90deg, #2f8f5b, #50ff8c); }
+  .tp-wrap .risk-meta span:first-child { color: var(--green); }
+  .tp-mode { font-size: 9px; color: var(--muted); letter-spacing: .12em; margin-left: 6px; }
+  .tp-wrap.protect .risk-label { color: var(--gold); }
+  .tp-wrap.protect .risk-track { box-shadow: inset 0 0 0 1px rgba(255,225,100,.5); }
+
+  .edit-wrap .limit-edit { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+  .limit-edit label { display: grid; gap: 3px; font-size: 10px; letter-spacing: .12em;
+                      text-transform: uppercase; color: var(--muted); }
+  .limit-edit input[type="number"] { width: 110px; height: 28px; padding: 0 8px;
+    background: #05050c; color: var(--text); border: 1px solid #23233a;
+    border-radius: 6px; font: 12px 'Courier New', monospace; }
+  .limit-edit .auto-lbl { display: flex; align-items: center; gap: 6px; text-transform: none;
+                          letter-spacing: .04em; font-size: 11px; }
+  #limits-saved { font-size: 11px; min-width: 120px; }
+
+</style>
+</style>
+</head>
+<body>
+<canvas id="orb"></canvas>
+
+<div class="hud">
+  <header class="hdr">
+    <div>
+      <div class="hdr-title">Gaze</div>
+      <div class="hdr-sub">P&amp;L Tracker · port 3001</div>
+    </div>
+    <div>
+      <span id="total-pnl" class="pnl-big flat">$0.00</span>
+      <span id="total-pnl-pct" class="pnl-meta"></span>
+    </div>
+    <div class="hdr-actions">
+      <!-- Same chip row, same order as Predator so the two dashboards read as one system. -->
+      <span id="conn" class="status-chip">connecting…</span>
+      <span id="pos-count" class="status-chip">0 open</span>
+      <button id="btn-market-view" class="btn primary" type="button">📈 Market View</button>
+      <button id="btn-closed" class="btn" type="button">Closed</button>
+      <button id="btn-predator" class="btn" type="button">Predator Dashboard</button>
+      <button id="btn-overseer" class="btn" type="button">Overseer Dashboard</button>
+      <button id="btn-open" class="btn primary" type="button">Open Position</button>
+      <button id="btn-close" class="btn danger" type="button" disabled>Close Position</button>
+    </div>
+  </header>
+
+
+  <div class="risk-wrap">
+    <div class="risk-label">Daily Risk</div>
+    <div class="risk-track"><div id="risk-fill" class="risk-fill"></div></div>
+    <div class="risk-meta"><span id="risk-used">$0</span> / <span id="risk-limit">$500</span></div>
+    <div class="risk-ticks"><span>soft 50%</span><span>warn 80%</span><span>hard 100%</span></div>
+  </div>
+
+  <!-- Daily Take Profit — the same meter, the other side of the day.
+       Reaches 100% and trading stops. Reset together with Daily Risk:
+       both are read from today's closed book, so they reset on the same edge. -->
+  <div class="risk-wrap tp-wrap" id="tp-wrap">
+    <div class="risk-label">Daily Take Profit <span class="tp-mode" id="tp-mode"></span></div>
+    <div class="risk-track"><div id="tp-fill" class="risk-fill tp-fill"></div></div>
+    <div class="risk-meta"><span id="tp-profit">$0</span> / <span id="tp-target">$0</span></div>
+    <div class="risk-ticks"><span>soft 50%</span><span>warn 80%</span><span>hard 100%</span></div>
+  </div>
+
+  <div class="risk-wrap edit-wrap">
+    <div class="risk-label">Set The Day</div>
+    <div class="limit-edit">
+      <label>Daily risk ($) <input id="in-risk" type="number" min="0" step="10" /></label>
+      <label>Take profit ($) <input id="in-tp" type="number" min="0" step="10" /></label>
+      <label class="auto-lbl"><input id="in-tp-auto" type="checkbox" checked /> TP follows risk &times;3</label>
+      <button id="btn-save-limits" class="btn primary" type="button">Save</button>
+      <span id="limits-saved" class="pnl-meta"></span>
+    </div>
+  </div>
+
+  <main id="cards" class="cards">
+    <div class="empty">No open positions &mdash; click Closed to see trade history</div>
+  </main>
+
+  <main id="closed-panel" class="cards" hidden>
+    <div class="empty">No closed positions yet</div>
+  </main>
+</div>
+
+  <footer class="footer">
+    <span id="last-refresh">—</span>
+    <span>auto-refresh 5s · GET /api/gaze&#47;* · /api/risk/status</span>
+    <span id="trim-audit">trims: …</span>
+  </footer>
+</div>
+
+<div id="open-panel" role="dialog" aria-label="Open position">
+  <div class="panel-title">
+    <span>Open Position</span>
+    <span class="x" id="panel-x" title="Close">×</span>
+  </div>
+  <form id="open-form" class="form-grid" autocomplete="off">
+    <div class="field" style="grid-column:1/-1;">
+      <label for="of-building">Send to building</label>
+      <select id="of-building" name="building">
+        <option value="">— not assigned to a trader —</option>
+      </select>
+      <div style="font-size:9px;color:var(--muted);margin-top:3px;" id="of-building-note">Pick which trader in the city this trade belongs to. Trades in different buildings never interfere.</div>
+    </div>
+
+    <div class="field">
+      <label for="f-symbol">Symbol</label>
+      <input id="f-symbol" name="symbol" type="text" value="BTC" required />
+    </div>
+    <div class="field">
+      <label for="f-direction">Direction</label>
+      <select id="f-direction" name="direction" required>
+        <option value="long">Long</option>
+        <option value="short">Short</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-entry">Entry Price</label>
+      <input id="f-entry" name="entry" type="number" step="any" min="0" value="65000" required />
+      <button type="button" class="mkt-btn" id="of-market" title="Fill entry at the live market price">Market</button>
+    </div>
+    <div class="field">
+      <label for="f-size">Margin ($)</label>
+      <div style="font-size:9px;color:var(--muted);margin-top:2px;">Dollars you put up. $2,000 at 10x = a $20,000 position.</div>
+      <input id="f-size" name="size" type="number" step="any" min="0" value="0.1" required />
+    </div>
+    <div class="field">
+      <label for="f-leverage">Leverage (x)</label>
+      <input id="f-leverage" name="leverage" type="number" step="any" min="1" value="100" required />
+    </div>
+    <div class="field">
+      <label for="f-stop">Stop</label>
+      <input id="f-stop" name="stop" type="number" step="any" min="0" value="64000" required />
+    </div>
+    <div class="field full">
+      <label for="f-target">Target</label>
+      <input id="f-target" name="target" type="number" step="any" min="0" value="67000" required />
+    </div>
+    <div class="panel-actions field full">
+      <button type="button" class="btn" id="btn-cancel">Cancel</button>
+      <button type="submit" class="btn primary" id="btn-submit">Submit</button>
+    </div>
+    <div id="form-error" class="field full"></div>
+  </form>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  const API = (location.origin && location.origin !== 'null') ? location.origin : 'http://127.0.0.1:3001';
+  const REFRESH_MS = 5000;
+
+  const COLORS = {
+    profitable: [80, 255, 140],
+    losing: [255, 80, 80],
+    warning: [255, 225, 100],
+    idle: [180, 200, 220],
+  };
+  const KANJI = { profitable: '益', losing: '損', warning: '警', idle: '空' };
+
+  let orbState = 'idle';
+  let targetRgb = COLORS.idle.slice();
+  let currentRgb = COLORS.idle.slice();
+  let pulse = 0;
+  let selectedId = null;
+  let positions = [];
+  let risk = { daily_used: 0, daily_limit: null, daily_take_profit: null,
+               daily_profit: null, offline: true };
+  let statusMap = {};
+  let refreshing = false;
+  let newIds = new Set();
+
+  // ---------- formatting ----------
+  const fmtMoney = (n) => {
+    const v = Number(n) || 0;
+    const sign = v < 0 ? '-' : '';
+    return sign + '$' + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  const fmtPrice = (n) => {
+    const v = Number(n) || 0;
+    if (Math.abs(v) >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return String(v);
+  };
+  const fmtPct = (n) => (Number(n) || 0).toFixed(2) + '%';
+
+  function timeInPosition(openedAt) {
+    const t0 = Date.parse(openedAt);
+    if (!Number.isFinite(t0)) return '—';
+    let s = Math.max(0, Math.floor((Date.now() - t0) / 1000));
+    const h = Math.floor(s / 3600); s %= 3600;
+    const m = Math.floor(s / 60); const sec = s % 60;
+    if (h > 0) return h + 'h ' + m + 'm';
+    if (m > 0) return m + 'm ' + sec + 's';
+    return sec + 's';
+  }
+
+  function stopProgress(p, current) {
+    const entry = Number(p.entry), stop = Number(p.stop);
+    const long = String(p.direction).toLowerCase() !== 'short';
+    const denom = entry - stop;
+    if (!denom) return 0;
+    const num = long ? entry - current : current - entry;
+    return Math.max(0, Math.min(100, (num / denom) * 100));
+  }
+
+  function targetProgress(p, current) {
+    const entry = Number(p.entry), target = Number(p.target);
+    const long = String(p.direction).toLowerCase() !== 'short';
+    const denom = long ? target - entry : entry - target;
+    if (!denom) return 0;
+    const num = long ? current - entry : entry - current;
+    return Math.max(0, Math.min(100, (num / denom) * 100));
+  }
+
+  function stopDistPct(p, current) {
+    const stop = Number(p.stop), entry = Number(p.entry);
+    if (!entry) return 0;
+    return Math.abs(current - stop) / entry * 100;
+  }
+
+  function targetDistPct(p, current) {
+    const target = Number(p.target), entry = Number(p.entry);
+    if (!entry) return 0;
+    return Math.abs(target - current) / entry * 100;
+  }
+
+  // ---------- toast ----------
+  let toastTimer = null;
+  function toast(msg, isErr) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.toggle('err', !!isErr);
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+  }
+
+  // ---------- API ----------
+  async function getJSON(path) {
+    const res = await fetch(API + path, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(path + ' → HTTP ' + res.status);
+    return res.json();
+  }
+
+  async function refresh() {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      const [posRes, statusRes, riskRes, trimRes] = await Promise.all([
+        getJSON('/api/gaze/positions').catch(() => ({ positions: [] })),
+        getJSON('/api/gaze/status').catch(() => ({ positions: [], total_pnl: 0, total_pnl_pct: 0, count: 0 })),
+        getJSON('/api/risk/status').catch(() => ({ ...risk, offline: true })),
+        getJSON('/api/gaze/trim-audit').catch(() => null),
+      ]);
+      positions = Array.isArray(posRes.positions) ? posRes.positions : [];
+      statusMap = {};
+      (statusRes.positions || []).forEach((s) => { if (s.symbol) statusMap[String(s.symbol).toUpperCase()] = s; });
+      risk = riskRes || risk;
+      const _trimEl = document.getElementById('trim-audit');
+      if (_trimEl && trimRes) { _trimEl.textContent = 'trims hit ' + (trimRes.with_any_trim_level_hit||0) + ' · trims taken ' + (trimRes.with_trims_taken||0) + ' · realized P&L ' + (trimRes.with_realized_pnl||0); }
+
+      // enrich list with live status when list fields stale
+      positions.forEach((p) => {
+        const live = statusMap[String(p.symbol).toUpperCase()];
+        if (live) {
+          p._live_current = Number(live.current);
+          p._live_pnl = Number(live.pnl);
+          p._live_pnl_pct = Number(live.pnl_pct);
+          p._live_r = Number(live.r_multiple);
+        }
+      });
+
+      const conn = document.getElementById('conn');
+      conn.textContent = 'connected';
+      conn.className = 'status-chip ok';
+
+      renderTotals(statusRes);
+      renderRisk();
+      renderCards();
+      document.getElementById('last-refresh').textContent = 'updated ' + new Date().toLocaleTimeString();
+      document.getElementById('pos-count').textContent = positions.length + ' open';
+    } catch (err) {
+      const conn = document.getElementById('conn');
+      conn.textContent = 'offline';
+      conn.className = 'status-chip err';
+      console.warn(err);
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  function renderTotals(statusRes) {
+    const total = Number(statusRes.total_pnl) || 0;
+    const pct = Number(statusRes.total_pnl_pct) || 0;
+    const el = document.getElementById('total-pnl');
+    const pctEl = document.getElementById('total-pnl-pct');
+    el.textContent = fmtMoney(total);
+    el.className = 'pnl-big ' + (total > 0 ? 'pos' : total < 0 ? 'neg' : 'flat');
+    pctEl.textContent = positions.length ? (pct >= 0 ? '+' : '') + fmtPct(pct) : '';
+
+    if (positions.length === 0) orbState = 'idle';
+    else if (riskPct() > 80) orbState = 'warning';
+    else if (total > 0) orbState = 'profitable';
+    else if (total < 0) orbState = 'losing';
+    else orbState = 'idle';
+    targetRgb = COLORS[orbState].slice();
+  }
+
+  function riskPct() {
+    const used = Number(risk.daily_used) || 0;
+    const limit = Number(risk.daily_limit) || 500;
+    if (!limit) return 0;
+    return (used / limit) * 100;
+  }
+
+  function renderRisk() {
+    const pct = riskPct();
+    const fill = document.getElementById('risk-fill');
+    fill.style.width = Math.min(100, pct) + '%';
+    fill.className = 'risk-fill' + (pct >= 100 ? ' hard' : pct >= 80 ? ' crit' : pct >= 50 ? ' warn' : '');
+    document.getElementById('risk-used').textContent = fmtMoney(risk.daily_used).replace('.00', '');
+    document.getElementById('risk-limit').textContent = fmtMoney(risk.daily_limit).replace('.00', '');
+
+    // Daily Take Profit rides the same poll and the same status object, so it
+    // can never disagree with Daily Risk about where the day stands.
+    if (typeof paintTakeProfit === 'function') paintTakeProfit(risk);
+
+    if (positions.length && pct > 80 && orbState !== 'warning') {
+      orbState = 'warning';
+      targetRgb = COLORS.warning.slice();
+    }
+  }
+
+  function liveOf(p) {
+    if (p._live_current != null) {
+      return {
+        current: p._live_current,
+        pnl: p._live_pnl,
+        pnl_pct: p._live_pnl_pct,
+        r: p._live_r,
+      };
+    }
+    return {
+      current: Number(p.current_price) || Number(p.entry),
+      pnl: Number(p.pnl) || 0,
+      pnl_pct: Number(p.pnl_pct) || 0,
+      r: Number(p.r_multiple) || 0,
+    };
+  }
+
+  function cardHTML(p, live) {
+    const dir = String(p.direction || 'long').toLowerCase();
+    const pnl = live.pnl;
+    const pnlCls = pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : 'flat';
+    const sp = stopProgress(p, live.current);
+    const tp = targetProgress(p, live.current);
+    const selected = p.id === selectedId ? ' selected' : '';
+    const entering = newIds.has(p.id) ? ' entering' : '';
+    return (
+      '<article class="card ' + dir + selected + entering + '" data-id="' + escapeAttr(p.id) + '" tabindex="0">' +
+        '<div class="card-top">' +
+          '<span class="card-sym">' + escapeHtml(p.symbol || '?') + '</span>' +
+          '<span class="badge ' + dir + '">' + (dir === 'short' ? 'Short' : 'Long') + '</span>' +
+        '</div>' +
+        '<div class="card-pnl ' + pnlCls + '">' + fmtMoney(pnl) + '</div>' +
+        '<div class="card-pnl-sub">' +
+          (pnl >= 0 ? '+' : '') + fmtPct(live.pnl_pct) +
+          ' · R ' + (live.r >= 0 ? '+' : '') + live.r.toFixed(2) +
+        '</div>' +
+        '<div class="prices">' +
+          '<div><div class="k">Entry</div><div class="v">' + fmtPrice(p.entry) + '</div></div>' +
+          '<div><div class="k">Current</div><div class="v">' + fmtPrice(live.current) + '</div></div>' +
+          '<div><div class="k">Stop</div><div class="v">' + fmtPrice(p.stop) + ' <span style="color:var(--muted)">(' + stopDistPct(p, live.current).toFixed(2) + '%)</span></div></div>' +
+          '<div><div class="k">Target</div><div class="v">' + fmtPrice(p.target) + ' <span style="color:var(--muted)">(' + targetDistPct(p, live.current).toFixed(2) + '%)</span></div></div>' +
+        // `size` is margin in DOLLARS. Show it, the notional, and the coin count,
+        // so 2000 can never be misread as 2000 BTC.
+        (function(){
+          const margin = Number(p.size || 0), lev = Number(p.leverage || 1);
+          const entry = Number(p.entry || 0);
+          const coins = entry > 0 ? margin / entry : 0;
+          return '<div><div class="k">Margin</div><div class="v">$' + fmtMoney(margin) + '</div></div>' +
+                 '<div><div class="k">Position size</div><div class="v">$' + fmtMoney(margin * lev) +
+                 ' <span style="color:var(--muted)">(' + lev + 'x)</span></div></div>' +
+                 '<div><div class="k">Units</div><div class="v">' + (coins ? coins.toFixed(6) : '—') +
+                 ' ' + escapeHtml(p.symbol || '') + '</div></div>';
+        })() +
+        '</div>' +
+        '<div class="meta-row">' +
+          '<span>size ' + escapeHtml(String(p.size)) + ' · lev ' + escapeHtml(String(p.leverage)) + 'x</span>' +
+          '<span class="r">' + timeInPosition(p.opened_at) + '</span>' +
+        '</div>' +
+        '<div class="bar-block">' +
+          '<div class="bar-head"><span>To stop</span><span>' + sp.toFixed(0) + '%</span></div>' +
+          '<div class="bar-track"><div class="bar-fill stop" style="width:' + sp + '%"></div></div>' +
+        '</div>' +
+        '<div class="bar-block">' +
+          '<div class="bar-head"><span>To target</span><span>' + tp.toFixed(0) + '%</span></div>' +
+          '<div class="bar-track"><div class="bar-fill target" style="width:' + tp + '%"></div></div>' +
+        '</div>' +
+      '</article>'
+    );
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  function renderCards() {
+    const root = document.getElementById('cards');
+    if (!positions.length) {
+      root.innerHTML = '<div class="empty">No open positions &mdash; click Closed to see trade history</div>';
+      selectedId = null;
+      document.getElementById('btn-close').disabled = true;
+      newIds.clear();
+      return;
+    }
+    if (selectedId && !positions.some((p) => p.id === selectedId)) {
+      selectedId = null;
+      document.getElementById('btn-close').disabled = true;
+    }
+    root.innerHTML = positions.map((p) => cardHTML(p, liveOf(p))).join('');
+    newIds.clear();
+    document.getElementById('btn-close').disabled = !selectedId;
+  }
+
+  // ---------- interactions ----------
+  document.getElementById('cards').addEventListener('click', (e) => {
+    const card = e.target.closest('.card');
+    if (!card) return;
+    selectedId = card.getAttribute('data-id');
+    document.querySelectorAll('.card').forEach((c) => c.classList.toggle('selected', c === card));
+    document.getElementById('btn-close').disabled = false;
+  });
+
+  const panel = document.getElementById('open-panel');
+  function openPanel() {
+    panel.classList.add('show');
+    document.getElementById('btn-open').classList.add('active');
+    document.getElementById('f-symbol').focus();
+  }
+  function closePanel() {
+    panel.classList.remove('show');
+    document.getElementById('btn-open').classList.remove('active');
+    document.getElementById('form-error').classList.remove('show');
+  }
+  document.getElementById('btn-open').addEventListener('click', () => {
+    if (panel.classList.contains('show')) closePanel();
+    else openPanel();
+  });
+  document.getElementById('btn-cancel').addEventListener('click', closePanel);
+  document.getElementById('panel-x').addEventListener('click', closePanel);
+
+  document.getElementById('open-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('form-error');
+    errEl.classList.remove('show');
+    const fd = new FormData(e.target);
+    const building = String(fd.get('building') || '').trim();
+    const body = {
+      symbol: String(fd.get('symbol') || '').trim().toUpperCase(),
+      direction: String(fd.get('direction') || 'long').toLowerCase(),
+      entry: Number(fd.get('entry')),
+      size: Number(fd.get('size')),
+      leverage: Number(fd.get('leverage')),
+      stop: Number(fd.get('stop')),
+      target: Number(fd.get('target')),
+      // Which building this trade belongs to. Kept on the position so trades in
+      // different buildings stay independent and are never conflated.
+      building: building || null,
+      trader: building || null,
+    };
+    if (!body.symbol || !Number.isFinite(body.entry) || !Number.isFinite(body.size) ||
+        !Number.isFinite(body.leverage) || !Number.isFinite(body.stop) || !Number.isFinite(body.target)) {
+      errEl.textContent = 'All fields required, numbers must be valid.';
+      errEl.classList.add('show');
+      return;
+    }
+    const btn = document.getElementById('btn-submit');
+    btn.disabled = true;
+    try {
+      const res = await fetch(API + '/api/gaze/position', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || data.detail || ('HTTP ' + res.status));
+      }
+      if (data.position && data.position.id) newIds.add(data.position.id);
+      closePanel();
+      pulse = 1;
+      toast('Opened ' + body.symbol + ' ' + body.direction);
+      await refresh();
+    } catch (err) {
+      errEl.textContent = String(err.message || err);
+      errEl.classList.add('show');
+      toast('Open failed: ' + err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  
+  // How much to close. Returns a percentage, or null if cancelled.
+  function askHowMuchToClose(pos) {
+    return new Promise((resolve) => {
+      const margin = Number(pos.size || 0), lev = Number(pos.leverage || 1);
+      const entry = Number(pos.entry || 0);
+      const coins = entry > 0 ? margin / entry : 0;
+      const cur = document.createElement('div');
+      cur.className = 'modal-back';
+      cur.innerHTML =
+        '<div class="modal-box">' +
+          '<div class="modal-title">Close position</div>' +
+          '<div class="modal-sub">' + (pos.symbol || '') + ' ' + (pos.direction || '') +
+            ' · margin <b>$' + fmtMoney(margin) + '</b> · position <b>$' + fmtMoney(margin * lev) + '</b>' +
+            (coins ? ' · ' + coins.toFixed(6) + ' ' + (pos.symbol || '') : '') + '</div>' +
+          '<div class="pct-row">' +
+            [25, 50, 80, 100].map(p =>
+              '<button class="pct-btn" data-pct="' + p + '">' + p + '%' +
+              '<small>$' + fmtMoney(margin * p / 100) + '</small></button>').join('') +
+          '</div>' +
+          '<div class="modal-note">Closing less than 100% keeps the position open and moves the stop to entry after the first trim.</div>' +
+          '<div class="modal-actions"><button class="btn" id="qc-cancel">Cancel</button></div>' +
+        '</div>';
+      document.body.appendChild(cur);
+      const done = (v) => { cur.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+      const onKey = (e) => { if (e.key === 'Escape') done(null); };
+      document.addEventListener('keydown', onKey);
+      cur.querySelectorAll('.pct-btn').forEach(b =>
+        b.addEventListener('click', () => done(Number(b.dataset.pct))));
+      cur.querySelector('#qc-cancel').addEventListener('click', () => done(null));
+      cur.addEventListener('click', (e) => { if (e.target === cur) done(null); });
+    });
+  }
+
+  document.getElementById('btn-close').addEventListener('click', async () => {
+      if (!selectedId) return;
+      const id = selectedId;
+      const pos = positions.find(p => p.id === id);
+      if (!pos) return;
+      // Ask how much to close. Closing 100% was the only option before, which
+      // made scaling out impossible from the UI.
+      const pct = await askHowMuchToClose(pos);
+      if (pct === null) return;
+      const btn = document.getElementById('btn-close');
+      btn.disabled = true;
+      try {
+        let msg;
+        if (pct >= 100) {
+          const res = await fetch(API + '/api/gaze/position/' + encodeURIComponent(id), { method: 'DELETE' });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.success === false) throw new Error(data.error || data.detail || ('HTTP ' + res.status));
+          msg = 'Closed 100% · P&L ' + fmtMoney(data.position && data.position.pnl);
+        } else {
+          const res = await fetch(API + '/api/gaze/position/' + encodeURIComponent(id) + '/trim', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pct: pct }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.success === false) throw new Error(data.error || data.detail || ('HTTP ' + res.status));
+          msg = 'Closed ' + pct + '% · banked ' + fmtMoney(data.realized_pnl) +
+                ' · left ' + fmtMoney(data.remaining_margin);
+          if (data.stop_moved_to) msg += ' · stop moved to entry';
+        }
+        const card = document.querySelector('.card[data-id="' + CSS.escape(id) + '"]');
+        if (card && pct >= 100) card.classList.add('leaving');
+        pulse = 1;
+        if (pct >= 100) selectedId = null;
+        toast(msg);
+        await new Promise((r) => setTimeout(r, 280));
+        await refresh();
+        btn.disabled = true;
+      } catch (err) {
+        toast('Close failed: ' + err.message, true);
+        btn.disabled = false;
+      }
+    });
+
+
+  // Cross-link to Predator — the observer that scans markets.
+  document.getElementById('btn-overseer').addEventListener('click', () => {
+    window.location.href = '/overseer/app.html';
+  });
+
+  document.getElementById('btn-predator').addEventListener('click', () => {
+    window.location.href = 'http://localhost:3001/predator/dashboard.html';
+  });
+
+
+  // Building picker — lets you send a trade to a specific trader in the city.
+  async function loadBuildings(formId, onPick) {
+    const sel = document.getElementById(formId + '-building');
+    const note = document.getElementById(formId + '-building-note');
+    if (!sel) return;
+    try {
+      const d = await (await fetch('/api/buildings')).json();
+      sel.innerHTML = '<option value="">— not assigned to a trader —</option>' +
+        d.slots.map(s => `<option value="${s.slot}"${s.symbol ? ' data-sym="' + s.symbol + '"' : ''}>` +
+          `${s.slot} · ${s.symbol} · ${s.trader || 'no trader'} · ${s.account}` +
+          `${s.can_trade ? '' : ' (chart only)'}</option>`).join('');
+      sel.addEventListener('change', () => { if (onPick) onPick(sel.value, sel); });
+      if (note) note.textContent = d.slots.filter(s => s.trader).length + ' of ' +
+        d.slots.length + ' buildings have a trader assigned.';
+    } catch (e) {
+      sel.innerHTML = '<option value="">buildings offline</option>';
+      if (note) note.textContent = 'Could not reach /api/buildings';
+    }
+  }
+
+  loadBuildings('of', (slot, sel) => {
+    const o = sel.selectedOptions[0];
+    if (o && o.dataset.sym) { const s = document.getElementById('f-symbol'); if (s) s.value = o.dataset.sym; }
+  });
+
+
+  // Position presets + a live read of what the numbers mean, so you never
+  // have to work out the arithmetic by hand again.
+  function wirePositionFields(formPrefix) {
+    const margin = document.getElementById(formPrefix === 'tf' ? 'tf-size' : 'f-size');
+    const lev    = document.getElementById(formPrefix === 'tf' ? 'tf-leverage' : 'f-leverage');
+    const entry  = document.getElementById(formPrefix === 'tf' ? 'tf-entry' : 'f-entry');
+    const stop   = document.getElementById(formPrefix === 'tf' ? 'tf-stop' : 'f-stop');
+    if (!margin) return;
+
+    const wrap = margin.closest('.field');
+    let row = wrap.parentElement.querySelector('.preset-row');
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'preset-row';
+      const presets = [['1000','5x'],['2000','5x'],['2000','10x'],['5000','5x'],['100','100x']];
+      row.innerHTML = presets.map(([m,l]) =>
+        `<button type="button" class="preset-btn" data-m="${m}" data-l="${l}">$${m} @ ${l}<small>$${Number(m)*Number(l.replace('x','')).toLocaleString()}</small></button>`).join('')
+        + '<button type="button" class="preset-btn" data-m="" data-l="">clear</button>';
+      wrap.parentElement.insertBefore(row, wrap.nextSibling);
+      row.addEventListener('click', (e) => {
+        const b = e.target.closest('.preset-btn');
+        if (!b) return;
+        if (b.dataset.m === '') { margin.value = ''; lev.value = ''; }
+        else { margin.value = b.dataset.m; lev.value = b.dataset.l.replace('x',''); }
+        readPosition();
+      });
+    }
+
+    let ro = wrap.parentElement.querySelector('.pos-readout');
+    if (!ro) {
+      ro = document.createElement('div');
+      ro.className = 'pos-readout';
+      wrap.parentElement.appendChild(ro);
+    }
+    function readPosition() {
+      const m = Number(margin.value), l = Number(lev.value);
+      const e = Number(entry.value), s = Number(stop.value);
+      if (!m || !l) { ro.innerHTML = 'Enter margin and leverage to see the position size.'; return; }
+      const notional = m * l;
+      let risk = '';
+      if (e > 0 && s > 0) {
+        const dist = Math.abs(e - s) / e * 100;
+        const loss = notional * dist / 100;
+        risk = ` · stop <b>${dist.toFixed(2)}%</b> away = <b>$${loss.toFixed(2)}</b> at risk`;
+      }
+      ro.innerHTML = `Margin <b>$${m.toLocaleString()}</b> × <b>${l}x</b> = position size <b>$${notional.toLocaleString()}</b>${risk}`;
+    }
+    [margin, lev, entry, stop].forEach(el => el && el.addEventListener('input', readPosition));
+    readPosition();
+  }
+
+  
+  // Fill the entry field with the LIVE market price at the moment of clicking.
+  // Predator's copy of this is missing `async`, so it returns a Promise and the
+  // field silently stays empty. Declared async here.
+  async function fillMarket(pre) {
+    const symEl = document.getElementById(pre === 'tf' ? 'tf-symbol' : 'f-symbol');
+    const entEl = document.getElementById(pre === 'tf' ? 'tf-entry' : 'f-entry');
+    const note  = document.getElementById(pre + '-mkt-note');
+    if (!symEl || !entEl) return;
+    const sym = String(symEl.value || 'BTC').trim().toUpperCase();
+    try {
+      const r = await fetch(API + '/api/market/ticker/' + encodeURIComponent(sym.toLowerCase()),
+                            { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      const px = Number(d.price);
+      if (!px || px <= 0) throw new Error('no price for ' + sym);
+      entEl.value = px.toFixed(2);
+      entEl.dataset.market = 'true';
+      if (note) note.textContent = 'Filled at market ' + sym + ' \u00b7 ' + entEl.value + ' (live at click)';
+      entEl.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (e) {
+      if (note) note.textContent = 'Could not reach the market price for ' + sym;
+    }
+  }
+
+document.getElementById('of-market').addEventListener('click', () => fillMarket('of'));
+  fillMarket('of');
+  wirePositionFields('of');
+
+  // ---------- Closed positions ----------
+  // closed-positions.json has been on disk the whole time with no endpoint and
+  // no UI. Both are now in place; this renders what the tracker recorded.
+  const closedEl = document.getElementById('closed-panel');
+  const cardsEl  = document.getElementById('cards');
+  let showingClosed = false;
+
+  function renderClosed(rows) {
+    if (!rows.length) {
+      closedEl.innerHTML = '<div class="empty">No closed positions yet &mdash; no trader has filled a trade yet. Open trades you place by hand will appear here.</div>';
+      return;
+    }
+    closedEl.innerHTML = rows.slice().reverse().map(p => {
+      const pnl = Number(p.pnl || 0);
+      const cls = pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : 'flat';
+      const r   = Number(p.r_multiple || 0);
+      const closedAt = p.closed_at || p.last_updated || p.opened_at || '';
+      return `<article class="card ${cls}">
+        <div class="card-top">
+          <span class="card-sym">${escapeAttr(p.symbol || '')}</span>
+          <span class="dir ${(p.direction||'').toLowerCase()}">${escapeAttr((p.direction||'').toUpperCase())}</span>
+          <span class="pnl ${cls}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span>
+        </div>
+        <div class="card-meta">
+          <span>entry ${escapeAttr(String(p.entry ?? ''))}</span>
+          <span>exit ${escapeAttr(String(p.current_price ?? ''))}</span>
+          <span>size ${escapeAttr(String(p.size ?? ''))}</span>
+          <span>${r.toFixed(2)}R</span>
+        </div>
+        <div class="card-foot">${escapeAttr(String(closedAt).slice(0, 19).replace('T', ' '))}
+          <button class="cd-del" data-id="${escapeAttr(p.id || '')}" title="Remove this record from history">remove</button>
+        </div>
+      </article>`;
+    }).join('');
+  }
+
+  async function loadClosed() {
+    try {
+      const d = await getJSON('/api/gaze/closed');
+      renderClosed(d.closed || []);
+    } catch (e) {
+      closedEl.innerHTML = '<div class="empty">Could not load closed positions</div>';
+    }
+  }
+
+  closedEl.addEventListener('click', async (e) => {
+    const b = e.target.closest('.cd-del');
+    if (!b) return;
+    e.stopPropagation();
+    const id = b.dataset.id;
+    if (!id) return;
+    b.disabled = true; b.textContent = 'removing…';
+    try {
+      const r = await fetch(API + '/api/gaze/closed/' + encodeURIComponent(id), { method: 'DELETE' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      toast('Removed from history');
+      await loadClosed();
+    } catch (err) {
+      toast('Remove failed: ' + err.message, true);
+      b.disabled = false; b.textContent = 'remove';
+    }
+  });
+
+  document.getElementById('btn-closed').addEventListener('click', async () => {
+    showingClosed = !showingClosed;
+    document.getElementById('btn-closed').classList.toggle('active', showingClosed);
+    if (showingClosed) { cardsEl.hidden = true; closedEl.hidden = false; await loadClosed(); }
+    else { cardsEl.hidden = false; closedEl.hidden = true; }
+  });
+
+  // Market View — the same DexView modal Predator uses, opened on whichever
+  // symbol the open position is actually in, so the chart always shows the
+  // trade you are looking at rather than defaulting to BTC.
+  document.getElementById('btn-market-view').addEventListener('click', () => {
+    // With no open position there is nothing to anchor to, so fall back to BTC
+    // explicitly rather than opening on a blank-looking market.
+    const open = positions[0] || null;
+    const sym = (selectedId && positions.find(p => p.id === selectedId)?.symbol)
+             || (open && open.symbol)
+             || 'BTC';
+    const url = '/predator/dexview-market.html?symbol=' + encodeURIComponent(sym);
+    const modal = document.createElement('div');
+    modal.id = 'market-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;padding:20px;';
+    modal.innerHTML = `
+      <div style="position:relative;width:min(960px,100%);height:min(700px,90vh);background:#0a0a14;border:1px solid rgba(0,200,255,0.25);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <span style="font-size:12px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#00c8ff;">Market View — ${sym}${open ? "" : " (no open position)"}</span>
+          <button id="market-modal-close" style="background:transparent;border:1px solid rgba(255,255,255,0.15);color:#aaa;font-size:16px;cursor:pointer;padding:4px 10px;border-radius:3px;">✕</button>
+        </div>
+        <iframe src="${url}" style="flex:1;width:100%;border:none;background:#020814;"></iframe>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('market-modal-close').onclick = () => modal.remove();
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  });
+
+  // ---------- orb ----------
+  const canvas = document.getElementById('orb');
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, CX = 0, CY = 0;
+  const stars = [];
+  const particles = [];
+
+  function resize() {
+    W = canvas.width = window.innerWidth || 800;
+    H = canvas.height = window.innerHeight || 600;
+    CX = W / 2;
+    CY = H / 2;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function initField() {
+    stars.length = 0;
+    particles.length = 0;
+    for (let i = 0; i < 60; i++) {
+      stars.push({ x: Math.random(), y: Math.random(), size: Math.random() * 1.2 + 0.4, speed: Math.random() * 0.008 + 0.003 });
+    }
+    for (let i = 0; i < 130; i++) {
+      particles.push(spawnParticle());
+    }
+  }
+
+  function spawnParticle() {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * Math.min(W, H) * 0.42;
+    return {
+      angle,
+      dist,
+      size: Math.random() * 2.2 + 0.6,
+      life: Math.random(),
+      speed: (Math.random() * 0.4 + 0.15) * (Math.random() < 0.5 ? -1 : 1),
+      drift: Math.random() * 0.3 + 0.1,
+    };
+  }
+  initField();
+
+  function rgbStr(a, alpha) {
+    return 'rgba(' + Math.round(a[0]) + ',' + Math.round(a[1]) + ',' + Math.round(a[2]) + ',' + (alpha == null ? 1 : alpha) + ')';
+  }
+
+  let spinT = 0;
+  let last = performance.now();
+
+  function drawRadialRays(count, len, spin, color, lineW) {
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.rotate(spin);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 36, Math.sin(a) * 36);
+      const pulseLen = len * (0.85 + 0.15 * Math.sin(spinT * 3 + i));
+      ctx.lineTo(Math.cos(a) * pulseLen, Math.sin(a) * pulseLen);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawKanjiDiamond(color) {
+    const size = 54 + Math.sin(spinT * 2) * 3;
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.rotate(Math.PI / 4 + Math.sin(spinT * 0.7) * 0.06);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 16 + pulse * 24;
+    ctx.strokeRect(-size / 2, -size / 2, size, size);
+    ctx.strokeStyle = rgbStr(currentRgb, 0.35);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-size / 2 - 8, -size / 2 - 8, size + 16, size + 16);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18;
+    ctx.font = '600 36px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(KANJI[orbState] || KANJI.idle, 0, 2);
+    ctx.restore();
+  }
+
+  function drawParticles(dt, color) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const baseR = Math.min(W, H) * 0.28;
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.angle += p.speed * dt * 0.4;
+      p.life -= dt * 0.12;
+      p.dist += p.drift * dt * 18;
+      if (p.life <= 0 || p.dist > baseR * 2.4) {
+        particles[i] = spawnParticle();
+        particles[i].dist = Math.random() * baseR * 0.3;
+        particles[i].life = 1;
+        continue;
+      }
+      const x = CX + Math.cos(p.angle) * p.dist;
+      const y = CY + Math.sin(p.angle) * p.dist * 0.85;
+      const alpha = Math.max(0, p.life) * 0.7;
+      ctx.fillStyle = rgbStr(currentRgb, alpha);
+      ctx.beginPath();
+      ctx.arc(x, y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawStarsField() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    stars.forEach((s) => {
+      s.y += s.speed * 0.016;
+      if (s.y > 1) s.y = 0;
+      ctx.fillStyle = 'rgba(200,220,255,' + (0.15 + 0.25 * Math.sin(spinT * 2 + s.x * 12)) + ')';
+      ctx.beginPath();
+      ctx.arc(s.x * W, s.y * H, s.size, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  function drawGlow(color) {
+    const g = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.min(W, H) * 0.45);
+    g.addColorStop(0, rgbStr(currentRgb, 0.14 + pulse * 0.1));
+    g.addColorStop(0.5, rgbStr(currentRgb, 0.05));
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawHudText(color) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    ctx.font = '700 11px "Segoe UI", sans-serif';
+    ctx.letterSpacing = '0.3em';
+    const label = orbState.toUpperCase();
+    ctx.fillText(label, CX, CY + 88);
+    ctx.restore();
+  }
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    spinT += dt;
+    pulse = Math.max(0, pulse - dt * 1.4);
+
+    for (let i = 0; i < 3; i++) {
+      currentRgb[i] += (targetRgb[i] - currentRgb[i]) * Math.min(1, dt * 3.5);
+    }
+
+    ctx.clearRect(0, 0, W, H);
+    const g = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.max(W, H) * 0.7);
+    g.addColorStop(0, 'rgba(5,5,15,0.92)');
+    g.addColorStop(0.5, 'rgba(2,2,8,0.96)');
+    g.addColorStop(1, '#000');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    drawStarsField();
+    drawGlow();
+    drawRadialRays(18, Math.min(W, H) * 0.32, spinT * 0.35, rgbStr(currentRgb, 0.35), 1.2);
+    drawParticles(dt, currentRgb);
+    const color = rgbStr(currentRgb, 1);
+    drawKanjiDiamond(color);
+    drawHudText(color);
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ---------- boot ----------
+  refresh();
+  setInterval(refresh, REFRESH_MS);
+  setInterval(() => {
+    // cheap clock on time-in-position without full re-render race
+    if (positions.length && !refreshing) renderCards();
+  }, 1000);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closePanel();
+    if (e.key === 'n' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
+      openPanel();
+    }
+  });
+
+  // ── Daily Take Profit + editable limits ────────────────────────────────
+  // The chairman sets the day from here. POST /api/risk/limits persists it, so
+  // the city, the operator prompts and every poll read the same numbers.
+  function $tp(id) { return document.getElementById(id); }
+// A failed read must never render as a plausible number. If the status
+  // endpoint is unreachable the meters say so instead of showing fiction.
+  function riskOffline(st) {
+    return !st || st.offline === true || st.daily_limit === null || st.daily_limit === undefined;
+  }
+
+  function paintTakeProfit(st) {
+    if (typeof riskOffline === 'function' && riskOffline(st)) {
+      if ($tp('tp-profit'))  $tp('tp-profit').textContent  = '\u2014';
+      if ($tp('tp-target')) $tp('tp-target').textContent = 'unavailable';
+      if ($tp('tp-fill'))   $tp('tp-fill').style.width = '0%';
+      if ($tp('tp-mode'))   $tp('tp-mode').textContent = '(no feed)';
+      if ($tp('tp-wrap'))   $tp('tp-wrap').classList.add('offline');
+      if ($tp('in-risk'))   $tp('in-risk').value = '';
+      if ($tp('in-tp'))     $tp('in-tp').value = '';
+      return;
+    }
+    const w0 = $tp('tp-wrap'); if (w0) w0.classList.remove('offline');
+    const tp = Number(st.daily_take_profit || 0);
+    const got = Number(st.daily_profit || 0);
+    const pct = tp > 0 ? Math.min(100, (got / tp) * 100) : 0;
+    const fill = $tp('tp-fill');
+    if (fill) fill.style.width = pct.toFixed(1) + '%';
+    if ($tp('tp-profit')) $tp('tp-profit').textContent = '$' + got.toFixed(0);
+    if ($tp('tp-target')) $tp('tp-target').textContent = '$' + tp.toFixed(0);
+    if ($tp('tp-mode')) $tp('tp-mode').textContent =
+      st.take_profit_mode === 'manual' ? '(fixed)' : '(= risk \u00d7 3)';
+    const w = $tp('tp-wrap');
+    if (w) w.classList.toggle('protect', !!st.protect_mode);
+    if ($tp('in-risk') && document.activeElement !== $tp('in-risk')) {
+      $tp('in-risk').value = Math.round(Number(st.daily_limit || 0));
+    }
+    if ($tp('in-tp') && document.activeElement !== $tp('in-tp')) {
+      $tp('in-tp').value = Math.round(tp);
+    }
+    if ($tp('in-tp-auto')) $tp('in-tp-auto').checked = st.take_profit_mode !== 'manual';
+    window.__riskState = st;
+  }
+
+  async function saveLimits() {
+    const out = $tp('limits-saved');
+    if (typeof riskOffline === 'function' && riskOffline(window.__riskState)) {
+      if (out) out.textContent = 'no feed \u2014 cannot save';
+      return;
+    }
+    const acct = 10000;
+    const risk = Number($tp('in-risk').value);
+    if (!isFinite(risk) || risk < 0) { if (out) out.textContent = 'enter a number'; return; }
+    const body = { account_size: acct, daily_loss_limit_pct: (risk / acct) * 100 };
+    if ($tp('in-tp-auto').checked) {
+      body.daily_take_profit_pct = null;
+    } else {
+      body.daily_take_profit_pct = (Number($tp('in-tp').value) / acct) * 100;
+    }
+    try {
+      const r = await fetch('/api/risk/limits', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      const d = await r.json();
+      if (d && d.ok) { paintTakeProfit(d.status); if (out) out.textContent = 'saved'; }
+      else if (out) out.textContent = 'error: ' + ((d && d.error) || 'rejected');
+    } catch (e) {
+      if (out) out.textContent = 'server unreachable';
+    }
+    setTimeout(function () { if (out) out.textContent = ''; }, 2500);
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    const b = document.getElementById('btn-save-limits');
+    if (b) b.addEventListener('click', saveLimits);
+  });
+})();
+</script>
+
+</body>
+</html>
