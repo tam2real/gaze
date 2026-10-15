@@ -1,0 +1,356 @@
+{
+  "positions": [
+    {
+      "id": "3ad9d1cc-ce9d-4471-abfa-953d0b2f264f",
+      "symbol": "SOL",
+      "direction": "long",
+      "entry": 107.66,
+      "size": 4.118132,
+      "leverage": 5,
+      "stop": 105.23171428571429,
+      "target": 111.85,
+      "current_price": 106.31,
+      "pnl": -0.26,
+      "pnl_pct": -6.27,
+      "r_multiple": -0.56,
+      "trim_levels": [
+        {
+          "level": 1,
+          "price": 109.04,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 2,
+          "price": 110.43,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 3,
+          "price": 111.85,
+          "action": "trim_25%",
+          "hit": false
+        }
+      ],
+      "status": "open",
+      "opened_at": "2026-10-13T04:05:20.446309+00:00",
+      "opened_at_ny": "2026-10-13 12:05:20 AM",
+      "last_updated": "2026-10-13T13:03:31.605152+00:00",
+      "last_updated_ny": "2026-10-13 12:05:20 AM"
+    },
+    {
+      "id": "7341348d-84d3-4b89-8050-b913581ff469",
+      "symbol": "XRP",
+      "direction": "long",
+      "entry": 1.3656,
+      "size": 352.406939,
+      "leverage": 5,
+      "stop": 1.3372237142857144,
+      "target": 1.41,
+      "current_price": 1.361,
+      "pnl": -5.94,
+      "pnl_pct": -1.68,
+      "r_multiple": -0.16,
+      "trim_levels": [
+        {
+          "level": 1,
+          "price": 1.38,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 2,
+          "price": 1.39,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 3,
+          "price": 1.41,
+          "action": "trim_25%",
+          "hit": false
+        }
+      ],
+      "status": "open",
+      "opened_at": "2026-10-13T09:02:56.919779+00:00",
+      "opened_at_ny": "2026-10-13 05:02:56 AM",
+      "last_updated": "2026-10-13T13:03:31.608608+00:00",
+      "last_updated_ny": "2026-10-13 05:02:56 AM"
+    },
+    {
+      "id": "f8b44b14-c6d1-4b50-a1f0-40e89263c5bd",
+      "symbol": "AVAX",
+      "direction": "long",
+      "entry": 10.296,
+      "size": 33.814247,
+      "leverage": 5,
+      "stop": 10.074200000000001,
+      "target": 10.96,
+      "current_price": 10.232,
+      "pnl": -1.05,
+      "pnl_pct": -3.11,
+      "r_multiple": -0.29,
+      "trim_levels": [
+        {
+          "level": 1,
+          "price": 10.52,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 2,
+          "price": 10.73,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 3,
+          "price": 10.96,
+          "action": "trim_25%",
+          "hit": false
+        }
+      ],
+      "status": "open",
+      "opened_at": "2026-10-13T09:31:40.749065+00:00",
+      "opened_at_ny": "2026-10-13 05:31:40 AM",
+      "last_updated": "2026-10-13T13:03:31.610822+00:00",
+      "last_updated_ny": "2026-10-13 05:31:40 AM"
+    },
+    {
+      "id": "76da8cbb-71fa-4f18-9bb3-94a8fadae718",
+      "symbol": "BNB",
+      "direction": "long",
+      "entry": 740.98,
+      "size": 0.758758,
+      "leverage": 5,
+      "stop": 731.0954285714286,
+      "target": 753.73,
+      "current_price": 740.34,
+      "pnl": -0.0,
+      "pnl_pct": -0.43,
+      "r_multiple": -0.06,
+      "trim_levels": [
+        {
+          "level": 1,
+          "price": 745.19,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 2,
+          "price": 749.39,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 3,
+          "price": 753.73,
+          "action": "trim_25%",
+          "hit": false
+        }
+      ],
+      "status": "open",
+      "opened_at": "2026-10-13T09:31:54.565053+00:00",
+      "opened_at_ny": "2026-10-13 05:31:54 AM",
+      "last_updated": "2026-10-13T13:03:31.612515+00:00",
+      "last_updated_ny": "2026-10-13 05:31:54 AM"
+    },
+    {
+      "id": "4940ef59-6e88-491d-9957-b43cf7c948d7",
+      "symbol": "ADA",
+      "direction": "long",
+      "entry": 0.2343,
+      "size": 1453.279151,
+      "leverage": 5,
+      "stop": 0.22913925714285716,
+      "target": 0.24,
+      "current_price": 0.2336,
+      "pnl": -21.71,
+      "pnl_pct": -1.49,
+      "r_multiple": -0.14,
+      "trim_levels": [
+        {
+          "level": 1,
+          "price": 0.24,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 2,
+          "price": 0.24,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 3,
+          "price": 0.24,
+          "action": "trim_25%",
+          "hit": false
+        }
+      ],
+      "status": "open",
+      "opened_at": "2026-10-13T09:49:02.190506+00:00",
+      "opened_at_ny": "2026-10-13 05:49:02 AM",
+      "last_updated": "2026-10-13T13:03:31.614561+00:00",
+      "last_updated_ny": "2026-10-13 05:49:02 AM"
+    },
+    {
+      "id": "71306e80-9f21-4601-85f2-7cb98d4fceaa",
+      "symbol": "BCH",
+      "direction": "long",
+      "entry": 270.26,
+      "size": 1.584338,
+      "leverage": 5,
+      "stop": 265.2105714285714,
+      "target": 286.13,
+      "current_price": 270.26,
+      "pnl": 0,
+      "pnl_pct": 0,
+      "r_multiple": 0,
+      "trim_levels": [
+        {
+          "level": 1,
+          "price": 275.5,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 2,
+          "price": 280.73,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 3,
+          "price": 286.13,
+          "action": "trim_25%",
+          "hit": false
+        }
+      ],
+      "status": "open",
+      "opened_at": "2026-10-13T10:17:28.152146+00:00",
+      "opened_at_ny": "2026-10-13 06:17:28 AM",
+      "last_updated": "2026-10-13T10:17:28.152365+00:00",
+      "last_updated_ny": "2026-10-13 06:17:28 AM"
+    },
+    {
+      "id": "60fcaabc-141d-41d4-b0ad-dd474e334dca",
+      "symbol": "LINK",
+      "direction": "long",
+      "entry": 12.862,
+      "size": 28.134415,
+      "leverage": 5,
+      "stop": 12.595422571428571,
+      "target": 13.34,
+      "current_price": 12.888,
+      "pnl": 0.28,
+      "pnl_pct": 1.01,
+      "r_multiple": 0.1,
+      "trim_levels": [
+        {
+          "level": 1,
+          "price": 13.02,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 2,
+          "price": 13.18,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 3,
+          "price": 13.34,
+          "action": "trim_25%",
+          "hit": false
+        }
+      ],
+      "status": "open",
+      "opened_at": "2026-10-13T10:40:05.301203+00:00",
+      "opened_at_ny": "2026-10-13 06:40:05 AM",
+      "last_updated": "2026-10-13T13:03:31.616015+00:00",
+      "last_updated_ny": "2026-10-13 06:40:05 AM"
+    },
+    {
+      "id": "e2f8315f-d45b-4c97-a2f0-28365622a403",
+      "symbol": "SUI",
+      "direction": "long",
+      "entry": 1.047,
+      "size": 367.132867,
+      "leverage": 5,
+      "stop": 1.0265714285714285,
+      "target": 1.13,
+      "current_price": 1.047,
+      "pnl": 0,
+      "pnl_pct": 0,
+      "r_multiple": 0,
+      "trim_levels": [
+        {
+          "level": 1,
+          "price": 1.07,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 2,
+          "price": 1.1,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 3,
+          "price": 1.13,
+          "action": "trim_25%",
+          "hit": false
+        }
+      ],
+      "status": "open",
+      "opened_at": "2026-10-13T11:23:48.064492+00:00",
+      "opened_at_ny": "2026-10-13 07:23:48 AM",
+      "last_updated": "2026-10-13T11:23:48.064791+00:00",
+      "last_updated_ny": "2026-10-13 07:23:48 AM"
+    },
+    {
+      "id": "bb3feaab-73f3-4a20-8bfe-ecc2f464013f",
+      "symbol": "ZEC",
+      "direction": "long",
+      "entry": 1187.53,
+      "size": 0.335844,
+      "leverage": 5,
+      "stop": 1163.7094285714286,
+      "target": 1318.67,
+      "current_price": 1187.53,
+      "pnl": 0,
+      "pnl_pct": 0,
+      "r_multiple": 0,
+      "trim_levels": [
+        {
+          "level": 1,
+          "price": 1230.81,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 2,
+          "price": 1274.08,
+          "action": "trim_25%",
+          "hit": false
+        },
+        {
+          "level": 3,
+          "price": 1318.67,
+          "action": "trim_25%",
+          "hit": false
+        }
+      ],
+      "status": "open",
+      "opened_at": "2026-10-13T11:56:34.486891+00:00",
+      "opened_at_ny": "2026-10-13 07:56:34 AM",
+      "last_updated": "2026-10-13T11:56:34.487005+00:00",
+      "last_updated_ny": "2026-10-13 07:56:34 AM"
+    }
+  ],
+  "last_updated": "2026-10-13T13:03:31.616020+00:00"
+}}
